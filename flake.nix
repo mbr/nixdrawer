@@ -12,9 +12,12 @@
   outputs =
     { disko, ... }:
     {
-      nixosModules.hetzner-cloud.imports = [
-        disko.nixosModules.disko
-        ./modules/nixos/hetzner-cloud.nix
-      ];
+      nixosModules = {
+        hetzner-cloud.imports = [
+          disko.nixosModules.disko
+          ./modules/nixos/hetzner-cloud.nix
+        ];
+        openssh-over-tailscale = import ./modules/nixos/openssh-over-tailscale.nix;
+      };
     };
 }
