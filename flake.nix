@@ -1,7 +1,20 @@
 {
   description = "A drawer of reusable Nix packages, modules, and tools";
 
-  outputs = { self }: {
-    nixosModules.hetzner-cloud = import ./modules/nixos/hetzner-cloud.nix;
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
+
+  outputs =
+    { disko, ... }:
+    {
+      nixosModules.hetzner-cloud.imports = [
+        disko.nixosModules.disko
+        ./modules/nixos/hetzner-cloud.nix
+      ];
+    };
 }
