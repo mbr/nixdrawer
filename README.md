@@ -40,7 +40,7 @@ SSH remains closed publicly if Tailscale is unavailable, so retain an out-of-ban
 A recommended setup is:
 
 1. Give each machine a dedicated, preauthorized Tailscale credential, preferably restricted to assigning a narrow tag. Store it with the host's secret provider and set `services.tailscale.authKeyFile`.
-2. Advertise that tag with `services.tailscale.extraUpFlags` and grant administrators access to its SSH port in the tailnet policy.
+2. Advertise that tag with `services.tailscale.advertiseTags` and grant administrators access to its SSH port in the tailnet policy.
 3. Configure authorized keys and stable OpenSSH host keys normally on the host.
 4. Keep OpenSSH ports out of the global firewall allowlists. Add any other private administration services explicitly to the `tailscale0` interface.
 
@@ -49,10 +49,10 @@ imports = [ nixdrawer.nixosModules.openssh-over-tailscale ];
 
 services.tailscale = {
   authKeyFile = "/run/keys/tailscale-auth";
-  extraUpFlags = [ "--advertise-tags=tag:servers" ];
+  advertiseTags = [ "tag:servers" ];
 };
 ```
 
 The module enables OpenSSH and Tailscale, disables password and keyboard-interactive authentication, and permits root login only with a key. Enrollment is persistent, waits for the network, and retries transient failures. Evaluation requires an authentication key file and the NixOS firewall, and rejects globally allowed OpenSSH ports.
 
-The module defines no custom options. Tailscale tags, authorized keys, host keys, SSH ports, and additional Tailscale-only services remain host configuration. Explicit public-interface rules and raw firewall rules can bypass the module's assertions and remain the consumer's responsibility.
+The module adds `services.tailscale.advertiseTags`, which defaults to an empty list and requires every value to start with `tag:`. Credentials, authorized keys, host keys, SSH ports, and additional Tailscale-only services remain host configuration. Explicit public-interface rules and raw firewall rules can bypass the module's assertions and remain the consumer's responsibility.
