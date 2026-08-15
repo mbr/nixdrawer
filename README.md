@@ -33,16 +33,9 @@ imports = [ nixdrawer.nixosModules.hetzner-cloud ];
 
 ### `openssh-over-tailscale`
 
-Limits OpenSSH exposure to a machine's `tailscale0` interface, using ordinary OpenSSH rather than Tailscale SSH.
+The module enables Tailscale and permits OpenSSH through the firewall on `tailscale0`. Unless another rule exposes the SSH port on another interface, SSH is reachable only through the tailnet.
 
-SSH remains closed publicly if Tailscale is unavailable, so retain an out-of-band recovery path.
-
-A recommended setup is:
-
-1. Give each machine a dedicated, preauthorized Tailscale credential, preferably restricted to assigning a narrow tag. Store it with the host's secret provider and set `services.tailscale.authKeyFile`.
-2. Advertise that tag with `services.tailscale.advertiseTags` and grant administrators access to its SSH port in the tailnet policy.
-3. Configure authorized keys and stable OpenSSH host keys normally on the host.
-4. Keep OpenSSH ports out of the global firewall allowlists. Add any other private administration services explicitly to the `tailscale0` interface.
+This is ordinary OpenSSH, not Tailscale SSH. SSH remains closed publicly if Tailscale is unavailable, so retain an out-of-band recovery path. The module sets secure OpenSSH defaults and allows root login with a key.
 
 ```nix
 imports = [ nixdrawer.nixosModules.openssh-over-tailscale ];
@@ -53,6 +46,13 @@ services.tailscale = {
 };
 ```
 
-The module enables OpenSSH and Tailscale, disables password and keyboard-interactive authentication, and permits root login only with a key. Enrollment is persistent, waits for the network, and retries transient failures. Evaluation requires an authentication key file and the NixOS firewall, and rejects globally allowed OpenSSH ports.
+| Option | Default | Description |
+| --- | --- | --- |
+| `services.tailscale.advertiseTags` | `[ ]` | Tags advertised when enrolling the machine. Every value must start with `tag:`. |
 
-The module adds `services.tailscale.advertiseTags`, which defaults to an empty list and requires every value to start with `tag:`. Credentials, authorized keys, host keys, SSH ports, and additional Tailscale-only services remain host configuration. Explicit public-interface rules and raw firewall rules can bypass the module's assertions and remain the consumer's responsibility.
+A recommended setup is:
+
+1. Create a dedicated [Tailscale OAuth client](https://tailscale.com/kb/1215/oauth-clients) with the `auth_keys` scope and permission to assign the machine's tag. A tagged [auth key](https://tailscale.com/kb/1085/auth-keys) also works, but expires after at most 90 days.
+2. Store the OAuth client secret or auth key with the host's secret provider and point `services.tailscale.authKeyFile` at the decrypted file.
+3. Put the permitted tag in `services.tailscale.advertiseTags` and grant administrators access to its SSH port in the tailnet policy.
+4. Configure authorized keys and stable OpenSSH host keys normally on the host.
