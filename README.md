@@ -23,7 +23,9 @@ Import modules explicitly from `nixdrawer.nixosModules`.
 
 An opinionated baseline suitable for most standard Hetzner Cloud web servers. The module includes the platform, networking, boot, and disk configuration needed to make a consuming NixOS flake suitable for provisioning with nixos-anywhere.
 
-The module points the server's `nixpkgs` registry at the NixOS release channel used by the flake (for example, `nixos-26.05`) instead of `nixpkgs-unstable`, which is usually the default. This requires using a stable-channel `nixpkgs` input or configuring `hetznerCloud.nixpkgsChannel` when using unstable or another non-standard channel. The registry source is fetched on demand rather than embedded in the system closure.
+The module points the server's `nixpkgs` registry at its NixOS release channel (for example, `nixos-26.05`) instead of the registry's usual `nixpkgs-unstable`. This allows commands such as `nix run nixpkgs#jq` to fetch nixpkgs only when they are run, rather than requiring every deployment to copy and store the nixpkgs source on the server.
+
+The default assumes that the consuming flake uses a stable NixOS channel. Set `hetznerCloud.nixpkgsChannel` to `nixos-unstable` or another channel when appropriate. Setting it to `null` preserves the NixOS default: the server registry points to the exact nixpkgs input revision used to build the system. This provides exact target-side reproducibility, but includes the complete nixpkgs source in the system closure, so it is copied to and stored on the server during deployment.
 
 ```nix
 imports = [ nixdrawer.nixosModules.hetzner-cloud ];
@@ -31,7 +33,7 @@ imports = [ nixdrawer.nixosModules.hetzner-cloud ];
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `hetznerCloud.nixpkgsChannel` | `"nixos-${config.system.nixos.release}"` | Channel used for target-side `nixpkgs` registry lookups; set to `nixos-unstable` for an unstable input or `null` to preserve NixOS's source-backed default. |
+| `hetznerCloud.nixpkgsChannel` | `"nixos-${config.system.nixos.release}"` | Channel fetched for target-side `nixpkgs` registry lookups. Set it to `nixos-unstable` for an unstable input, another channel name when appropriate, or `null` to use the exact nixpkgs input and include its source in the deployed system closure. |
 | `hetznerCloud.useCloudInit` | `false` | Use cloud-init for network configuration while preserving the configured hostname and SSH host keys. |
 
 ### `openssh-over-tailscale`

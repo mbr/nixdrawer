@@ -18,7 +18,7 @@ in
     nixpkgsChannel = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = "nixos-${config.system.nixos.release}";
-      description = "Nixpkgs channel exposed through the target's system registry; null preserves the NixOS default.";
+      description = "Channel fetched for target-side nixpkgs registry lookups; null uses the exact nixpkgs input and includes its source in the deployed system closure.";
     };
     useCloudInit = lib.mkEnableOption "cloud-init-based Hetzner configuration";
   };
