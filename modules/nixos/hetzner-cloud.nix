@@ -14,7 +14,14 @@ in
 {
   imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
 
-  options.hetznerCloud.useCloudInit = lib.mkEnableOption "cloud-init-based Hetzner configuration";
+  options.hetznerCloud = {
+    nixpkgsChannel = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "nixos-${config.system.nixos.release}";
+      description = "Nixpkgs channel exposed through the target's system registry; null preserves the NixOS default.";
+    };
+    useCloudInit = lib.mkEnableOption "cloud-init-based Hetzner configuration";
+  };
 
   config = {
     documentation.enable = false;
@@ -31,9 +38,9 @@ in
       useNetworkd = true;
     };
 
-    nix.registry.nixpkgs.to = {
+    nix.registry.nixpkgs.to = lib.mkIf (cfg.nixpkgsChannel != null) {
       type = "tarball";
-      url = "https://channels.nixos.org/nixos-${config.system.nixos.release}/nixexprs.tar.xz";
+      url = "https://channels.nixos.org/${cfg.nixpkgsChannel}/nixexprs.tar.xz";
     };
 
     services.cloud-init = lib.mkIf cfg.useCloudInit {
