@@ -31,6 +31,11 @@ in
       useNetworkd = true;
     };
 
+    nix.registry.nixpkgs.to = {
+      type = "tarball";
+      url = "https://channels.nixos.org/nixos-${config.system.nixos.release}/nixexprs.tar.xz";
+    };
+
     services.cloud-init = lib.mkIf cfg.useCloudInit {
       enable = true;
       network.enable = true;

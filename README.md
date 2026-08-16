@@ -21,7 +21,7 @@ Import modules explicitly from `nixdrawer.nixosModules`.
 
 ### `hetzner-cloud`
 
-An opinionated baseline suitable for most standard Hetzner Cloud web servers. The module includes the platform, networking, boot, and disk configuration needed to make a consuming NixOS flake suitable for provisioning with nixos-anywhere.
+An opinionated baseline suitable for most standard Hetzner Cloud web servers. The module includes the platform, networking, boot, and disk configuration needed to make a consuming NixOS flake suitable for provisioning with nixos-anywhere. It also points the server's `nixpkgs` registry entry at its NixOS release channel, allowing target-side Nix commands without embedding the nixpkgs source in the system closure.
 
 ```nix
 imports = [ nixdrawer.nixosModules.hetzner-cloud ];
