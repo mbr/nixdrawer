@@ -55,9 +55,8 @@ nixdrawer.lib.mkWebAppModule {
 It assumes that:
 
 - you're creating a web application;
-- it uses PostgreSQL locally or through an external connection URL;
-- it optionally uses Caddy as a local reverse proxy;
-- it binds its configured TCP or Unix listener.
+- it uses PostgreSQL locally or through an external connection URL; and
+- it optionally uses Caddy as a local reverse proxy.
 
 By default, the service runs the package's main program without arguments.
 `mkCommand` can construct another invocation, such as passing the generated
