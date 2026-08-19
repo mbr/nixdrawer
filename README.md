@@ -59,15 +59,19 @@ It assumes that:
 - it optionally uses Caddy as a local reverse proxy;
 - it binds its configured TCP or Unix listener.
 
-Setting `services.<name>.caddy.virtualHost` configures the application to use a
-private Unix socket and adds a Caddy virtual host, but does not enable Caddy.
-Deployments enable `services.caddy` explicitly. systemd manages the socket
-directory, while the application creates the socket. Caddy retries unavailable
-upstream connections for up to 30 seconds.
-
 By default, the service runs the package's main program without arguments.
 `mkCommand` can construct another invocation, such as passing the generated
 TOML configuration shown above.
+
+### Using an application
+
+An application module built with `mkWebAppModule` can be served through Caddy with:
+
+```nix
+services.caddy.enable = true;
+services.myapp.enable = true;
+services.myapp.caddy.virtualHost = "app.example.com";
+```
 
 ## NixOS modules
 
