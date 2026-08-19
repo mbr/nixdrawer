@@ -243,7 +243,9 @@ in
           Group = cfg.group;
           DynamicUser = true;
           Restart = "on-failure";
-          RestartSec = "10s";
+          RestartSec = "100ms";
+          RestartSteps = 10;
+          RestartMaxDelaySec = "2min";
           TimeoutStartSec = cfg.startupTimeout;
           TimeoutStopSec = cfg.shutdownTimeout;
 
