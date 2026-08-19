@@ -56,8 +56,7 @@ in
 
     group = lib.mkOption {
       type = lib.types.str;
-      default = cfg.user;
-      defaultText = lib.literalExpression "config.services.${name}.user";
+      default = "${name}-service";
       description = "Group under which the application runs.";
     };
 
@@ -142,12 +141,16 @@ in
         message = "services.${name}.openFirewall cannot be enabled with Caddy integration";
       }
       {
+        assertion = cfg.user != cfg.group;
+        message = "services.${name}.group must differ from the dynamic service user";
+      }
+      {
         assertion = !cfg.caddy.enable || cfg.caddy.virtualHost != null;
         message = "services.${name}.caddy.virtualHost must be set when Caddy integration is enabled";
       }
     ];
 
-    users.groups.${cfg.group} = lib.mkIf isUnixSocket { };
+    users.groups.${cfg.group} = { };
 
     services.caddy = lib.mkIf cfg.caddy.enable (
       {
