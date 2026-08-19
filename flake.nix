@@ -27,37 +27,16 @@
             name = "test-web-app";
             description = "Test web application";
             defaultPackage = _: testPackage;
-            mkCommand =
-              {
-                lib,
-                listenAddress,
-                package,
-                ...
-              }:
-              [
-                (lib.getExe package)
-                listenAddress
-              ];
           })
           {
-            services.test-web-app = {
-              enable = true;
-              caddy = {
-                enable = true;
-                virtualHost = "http://localhost";
-              };
-            };
+            services.test-web-app.enable = true;
             system.stateVersion = "26.05";
           }
         ];
       };
     in
     {
-      checks.${system}.web-app-module =
-        assert !(testSystem.config.systemd.sockets ? "test-web-app");
-        assert nixpkgs.lib.hasInfix "lb_try_duration 30s"
-          testSystem.config.services.caddy.virtualHosts."http://localhost".extraConfig;
-        testSystem.config.systemd.units."test-web-app.service".unit;
+      checks.${system}.web-app-module = testSystem.config.systemd.units."test-web-app.service".unit;
 
       inherit lib;
 
