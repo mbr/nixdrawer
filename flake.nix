@@ -29,14 +29,22 @@
             defaultPackage = _: testPackage;
           })
           {
-            services.test-web-app.enable = true;
+            services.test-web-app = {
+              enable = true;
+              caddy = {
+                enable = true;
+                virtualHost = "http://localhost";
+              };
+            };
             system.stateVersion = "26.05";
           }
         ];
       };
     in
     {
-      checks.${system}.web-app-module = testSystem.config.systemd.units."test-web-app.service".unit;
+      checks.${system}.web-app-module =
+        assert !(builtins.hasAttr "test-web-app" testSystem.config.systemd.sockets);
+        testSystem.config.systemd.units."test-web-app.service".unit;
 
       inherit lib;
 

@@ -28,6 +28,7 @@ let
       "127.0.0.1:3000";
   isUnixSocket = lib.hasPrefix "/" listenAddress;
   socketDirectory = builtins.dirOf listenAddress;
+  runtimeDirectory = lib.removePrefix "/run/" socketDirectory;
   tcpPortMatch = builtins.match "^.*:([0-9]+)$" listenAddress;
   tcpPort = if tcpPortMatch == null then null else lib.toInt (lib.head tcpPortMatch);
   databaseUrl =
@@ -64,13 +65,7 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       example = "/run/${name}/http.sock";
-      description = "TCP socket address or absolute Unix socket path configured for the systemd socket. When null, selects a private Unix socket with Caddy integration and a local TCP socket otherwise.";
-    };
-
-    socketGroup = lib.mkOption {
-      type = lib.types.str;
-      default = "${name}-proxy";
-      description = "Group permitted to connect to a Unix listener.";
+      description = "TCP socket address or absolute Unix socket path on which the application listens. When null, selects a private Unix socket with Caddy integration and a local TCP socket otherwise.";
     };
 
     caddy = {
@@ -147,24 +142,12 @@ in
         message = "services.${name}.openFirewall cannot be enabled with Caddy integration";
       }
       {
-        assertion = !isUnixSocket || cfg.user != cfg.socketGroup;
-        message = "services.${name}.socketGroup must differ from the dynamic service user";
-      }
-      {
         assertion = !cfg.caddy.enable || cfg.caddy.virtualHost != null;
         message = "services.${name}.caddy.virtualHost must be set when Caddy integration is enabled";
       }
     ];
 
-    users.groups.${cfg.socketGroup} = lib.mkIf isUnixSocket { };
-
-    systemd.tmpfiles.settings."10-${name}" = lib.mkIf isUnixSocket {
-      ${socketDirectory}.d = {
-        user = "root";
-        group = cfg.socketGroup;
-        mode = "0750";
-      };
-    };
+    users.groups.${cfg.group} = lib.mkIf isUnixSocket { };
 
     services.caddy = lib.mkIf cfg.caddy.enable (
       {
@@ -172,7 +155,9 @@ in
       }
       // lib.optionalAttrs (cfg.caddy.virtualHost != null) {
         virtualHosts.${cfg.caddy.virtualHost}.extraConfig = ''
-          reverse_proxy ${lib.optionalString isUnixSocket "unix/"}${listenAddress}
+          reverse_proxy ${lib.optionalString isUnixSocket "unix/"}${listenAddress} {
+            lb_try_duration 30s
+          }
         '';
       }
     );
@@ -192,20 +177,6 @@ in
       cfg.openFirewall && !isUnixSocket && tcpPort != null
     ) [ tcpPort ];
 
-    systemd.sockets.${name} = {
-      description = "${name} HTTP listener";
-      wantedBy = [ "sockets.target" ];
-      listenStreams = [ listenAddress ];
-      socketConfig = {
-        Accept = false;
-        FileDescriptorName = "http";
-      }
-      // lib.optionalAttrs isUnixSocket {
-        SocketGroup = cfg.socketGroup;
-        SocketMode = "0660";
-      };
-    };
-
     systemd.services = {
       ${name} = {
         description = description;
@@ -217,14 +188,11 @@ in
         ++ lib.optionals cfg.database.createLocally [
           "postgresql.service"
           "postgresql-setup.service"
-        ]
-        ++ [ "${name}.socket" ];
-        requires =
-          lib.optionals cfg.database.createLocally [
-            "postgresql.service"
-            "postgresql-setup.service"
-          ]
-          ++ [ "${name}.socket" ];
+        ];
+        requires = lib.optionals cfg.database.createLocally [
+          "postgresql.service"
+          "postgresql-setup.service"
+        ];
         startLimitIntervalSec = 0;
 
         serviceConfig = {
@@ -234,6 +202,7 @@ in
               cfg
               databaseUrl
               lib
+              listenAddress
               pkgs
               ;
             package = cfg.package;
@@ -272,12 +241,16 @@ in
           RestrictSUIDSGID = true;
           SystemCallArchitectures = "native";
           SystemCallFilter = [ "@system-service" ];
-          UMask = "0077";
+          UMask = if isUnixSocket then "0007" else "0077";
+        }
+        // lib.optionalAttrs isUnixSocket {
+          RuntimeDirectory = runtimeDirectory;
+          RuntimeDirectoryMode = "0750";
         };
       };
     }
     // lib.optionalAttrs (cfg.caddy.enable && isUnixSocket) {
-      caddy.serviceConfig.SupplementaryGroups = [ cfg.socketGroup ];
+      caddy.serviceConfig.SupplementaryGroups = [ cfg.group ];
     };
   };
 }

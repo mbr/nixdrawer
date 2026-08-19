@@ -34,6 +34,7 @@ nixdrawer.lib.mkWebAppModule {
     {
       databaseUrl,
       lib,
+      listenAddress,
       package,
       pkgs,
       ...
@@ -41,7 +42,7 @@ nixdrawer.lib.mkWebAppModule {
     let
       configurationFile = (pkgs.formats.toml { }).generate "myapp.toml" {
         database_url = databaseUrl;
-        listen_address = "systemd";
+        listen_address = listenAddress;
       };
     in
     [
@@ -56,8 +57,12 @@ It assumes that:
 - you're creating a web application;
 - it uses PostgreSQL locally or through an external connection URL;
 - it optionally uses Caddy as a local reverse proxy;
-- it serves HTTP through exactly one systemd-activated listener; and
+- it binds its configured TCP or Unix listener; and
 - it notifies systemd when startup is complete.
+
+With Caddy enabled, the application listens on a private Unix socket by default.
+systemd manages the socket directory, while the application creates the socket.
+Caddy retries unavailable upstream connections for up to 30 seconds.
 
 By default, the service runs the package's main program without arguments.
 `mkCommand` can construct another invocation, such as passing the generated
