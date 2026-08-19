@@ -44,6 +44,7 @@
     {
       checks.${system}.web-app-module =
         assert !(builtins.hasAttr "test-web-app" testSystem.config.systemd.sockets);
+        assert testSystem.config.systemd.services.test-web-app.serviceConfig.Type == "exec";
         testSystem.config.systemd.units."test-web-app.service".unit;
 
       inherit lib;

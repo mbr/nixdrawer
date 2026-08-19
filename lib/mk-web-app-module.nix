@@ -84,12 +84,6 @@ in
       description = "Whether to open the application port in the firewall.";
     };
 
-    startupTimeout = lib.mkOption {
-      type = lib.types.ints.positive;
-      default = 60;
-      description = "Seconds allowed for application initialization.";
-    };
-
     shutdownTimeout = lib.mkOption {
       type = lib.types.ints.positive;
       default = 30;
@@ -199,7 +193,7 @@ in
         startLimitIntervalSec = 0;
 
         serviceConfig = {
-          Type = "notify";
+          Type = "exec";
           ExecStart = utils.escapeSystemdExecArgs (mkCommand {
             inherit
               cfg
@@ -217,7 +211,6 @@ in
           RestartSec = "100ms";
           RestartSteps = 10;
           RestartMaxDelaySec = "2min";
-          TimeoutStartSec = cfg.startupTimeout;
           TimeoutStopSec = cfg.shutdownTimeout;
 
           CapabilityBoundingSet = "";
