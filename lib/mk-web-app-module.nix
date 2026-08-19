@@ -19,16 +19,7 @@
 }:
 let
   cfg = config.services.${name};
-  listenAddress =
-    if cfg.listenAddress != null then
-      cfg.listenAddress
-    else if cfg.caddy.enable then
-      "/run/${name}/http.sock"
-    else
-      "127.0.0.1:3000";
-  isUnixSocket = lib.hasPrefix "/" listenAddress;
-  socketDirectory = builtins.dirOf listenAddress;
-  tcpPortMatch = builtins.match "^.*:([0-9]+)$" listenAddress;
+  tcpPortMatch = builtins.match "^.*:([0-9]+)$" cfg.listenAddress;
   tcpPort = if tcpPortMatch == null then null else lib.toInt (lib.head tcpPortMatch);
   databaseUrl =
     if cfg.database.createLocally then
@@ -61,16 +52,9 @@ in
     };
 
     listenAddress = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      example = "/run/${name}/http.sock";
-      description = "TCP socket address or absolute Unix socket path configured for the systemd socket. When null, selects a private Unix socket with Caddy integration and a local TCP socket otherwise.";
-    };
-
-    socketGroup = lib.mkOption {
       type = lib.types.str;
-      default = "${name}-proxy";
-      description = "Group permitted to connect to a Unix listener.";
+      default = "127.0.0.1:3000";
+      description = "TCP socket address on which the application listens.";
     };
 
     caddy = {
@@ -131,24 +115,12 @@ in
         message = "services.${name}.database.url must be set when local database provisioning is disabled";
       }
       {
-        assertion = isUnixSocket || tcpPort != null;
-        message = "services.${name}.listenAddress must be null, a TCP socket address, or an absolute Unix socket path";
-      }
-      {
-        assertion = !isUnixSocket || lib.hasPrefix "/run/" socketDirectory;
-        message = "services.${name}.listenAddress Unix socket must be inside a subdirectory of /run";
-      }
-      {
-        assertion = !isUnixSocket || !cfg.openFirewall;
-        message = "services.${name}.openFirewall cannot be enabled with a Unix listener";
+        assertion = tcpPort != null;
+        message = "services.${name}.listenAddress must be a TCP socket address";
       }
       {
         assertion = !cfg.caddy.enable || !cfg.openFirewall;
         message = "services.${name}.openFirewall cannot be enabled with Caddy integration";
-      }
-      {
-        assertion = !isUnixSocket || cfg.user != cfg.socketGroup;
-        message = "services.${name}.socketGroup must differ from the dynamic service user";
       }
       {
         assertion = !cfg.caddy.enable || cfg.caddy.virtualHost != null;
@@ -156,23 +128,15 @@ in
       }
     ];
 
-    users.groups.${cfg.socketGroup} = lib.mkIf isUnixSocket { };
-
-    systemd.tmpfiles.settings."10-${name}" = lib.mkIf isUnixSocket {
-      ${socketDirectory}.d = {
-        user = "root";
-        group = cfg.socketGroup;
-        mode = "0750";
-      };
-    };
-
     services.caddy = lib.mkIf cfg.caddy.enable (
       {
         enable = lib.mkDefault true;
       }
       // lib.optionalAttrs (cfg.caddy.virtualHost != null) {
         virtualHosts.${cfg.caddy.virtualHost}.extraConfig = ''
-          reverse_proxy ${lib.optionalString isUnixSocket "unix/"}${listenAddress}
+          reverse_proxy ${cfg.listenAddress} {
+            lb_try_duration 30s
+          }
         '';
       }
     );
@@ -188,23 +152,7 @@ in
       ];
     };
 
-    networking.firewall.allowedTCPPorts = lib.mkIf (
-      cfg.openFirewall && !isUnixSocket && tcpPort != null
-    ) [ tcpPort ];
-
-    systemd.sockets.${name} = {
-      description = "${name} HTTP listener";
-      wantedBy = [ "sockets.target" ];
-      listenStreams = [ listenAddress ];
-      socketConfig = {
-        Accept = false;
-        FileDescriptorName = "http";
-      }
-      // lib.optionalAttrs isUnixSocket {
-        SocketGroup = cfg.socketGroup;
-        SocketMode = "0660";
-      };
-    };
+    networking.firewall.allowedTCPPorts = lib.mkIf (cfg.openFirewall && tcpPort != null) [ tcpPort ];
 
     systemd.services = {
       ${name} = {
@@ -217,14 +165,11 @@ in
         ++ lib.optionals cfg.database.createLocally [
           "postgresql.service"
           "postgresql-setup.service"
-        ]
-        ++ [ "${name}.socket" ];
-        requires =
-          lib.optionals cfg.database.createLocally [
-            "postgresql.service"
-            "postgresql-setup.service"
-          ]
-          ++ [ "${name}.socket" ];
+        ];
+        requires = lib.optionals cfg.database.createLocally [
+          "postgresql.service"
+          "postgresql-setup.service"
+        ];
         startLimitIntervalSec = 0;
 
         serviceConfig = {
@@ -236,6 +181,7 @@ in
               lib
               pkgs
               ;
+            listenAddress = cfg.listenAddress;
             package = cfg.package;
           });
           User = cfg.user;
@@ -275,9 +221,6 @@ in
           UMask = "0077";
         };
       };
-    }
-    // lib.optionalAttrs (cfg.caddy.enable && isUnixSocket) {
-      caddy.serviceConfig.SupplementaryGroups = [ cfg.socketGroup ];
     };
   };
 }
