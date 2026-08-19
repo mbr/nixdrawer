@@ -1,7 +1,6 @@
 {
   name,
   defaultPackage,
-  defaultPackageText,
   description ? "${name} web application",
   mkCommand ?
     {
@@ -44,7 +43,7 @@ in
     package = lib.mkOption {
       type = lib.types.package;
       default = defaultPackage pkgs;
-      defaultText = lib.literalExpression defaultPackageText;
+      defaultText = lib.literalMD "the package supplied to `mkWebAppModule`";
       description = "Application package to run.";
     };
 

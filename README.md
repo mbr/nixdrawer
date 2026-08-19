@@ -22,22 +22,14 @@ are available from `nixdrawer.lib`.
 
 ### `mkWebAppModule`
 
-`mkWebAppModule` constructs an opinionated NixOS module for a web application
-package whose executable is identified by `meta.mainProgram`. It provides a
-hardened systemd service, socket activation, optional local PostgreSQL
-provisioning, external database configuration, optional Caddy integration, and
-firewall policy.
-
-The executable must consume the inherited listener and notify systemd when it
-is ready. By default the service runs the package's main program without
-arguments. `mkCommand` can privately construct another invocation and receives
-the selected package and database URL:
+`mkWebAppModule` constructs an opinionated NixOS module for a web application,
+i.e. you use it to construct the module exported by an application flake. The
+package must identify its executable through `meta.mainProgram`:
 
 ```nix
 nixdrawer.lib.mkWebAppModule {
   name = "myapp";
   defaultPackage = pkgs: self.packages.${pkgs.stdenv.hostPlatform.system}.default;
-  defaultPackageText = "self.packages.\${pkgs.stdenv.hostPlatform.system}.default";
   mkCommand =
     {
       databaseUrl,
@@ -58,6 +50,18 @@ nixdrawer.lib.mkWebAppModule {
     ];
 }
 ```
+
+It assumes that:
+
+- you're creating a web application;
+- it uses PostgreSQL locally or through an external connection URL;
+- it optionally uses Caddy as a local reverse proxy;
+- it serves HTTP through exactly one systemd-activated listener; and
+- it notifies systemd when startup is complete.
+
+By default, the service runs the package's main program without arguments.
+`mkCommand` can construct another invocation, such as passing the generated
+TOML configuration shown above.
 
 ## NixOS modules
 

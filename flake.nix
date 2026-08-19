@@ -27,7 +27,6 @@
             name = "test-web-app";
             description = "Test web application";
             defaultPackage = _: testPackage;
-            defaultPackageText = "pkgs.test-web-app";
           })
           {
             services.test-web-app.enable = true;
