@@ -19,10 +19,11 @@
 }:
 let
   cfg = config.services.${name};
+  usesCaddy = cfg.caddy.virtualHost != null;
   listenAddress =
     if cfg.listenAddress != null then
       cfg.listenAddress
-    else if cfg.caddy.enable then
+    else if usesCaddy then
       "/run/${name}/http.sock"
     else
       "127.0.0.1:3000";
@@ -68,8 +69,6 @@ in
     };
 
     caddy = {
-      enable = lib.mkEnableOption "a Caddy reverse proxy for the application";
-
       virtualHost = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
@@ -131,33 +130,24 @@ in
         message = "services.${name}.openFirewall cannot be enabled with a Unix listener";
       }
       {
-        assertion = !cfg.caddy.enable || !cfg.openFirewall;
+        assertion = !usesCaddy || !cfg.openFirewall;
         message = "services.${name}.openFirewall cannot be enabled with Caddy integration";
       }
       {
         assertion = cfg.user != cfg.group;
         message = "services.${name}.group must differ from the dynamic service user";
       }
-      {
-        assertion = !cfg.caddy.enable || cfg.caddy.virtualHost != null;
-        message = "services.${name}.caddy.virtualHost must be set when Caddy integration is enabled";
-      }
     ];
 
     users.groups.${cfg.group} = { };
 
-    services.caddy = lib.mkIf cfg.caddy.enable (
-      {
-        enable = lib.mkDefault true;
-      }
-      // lib.optionalAttrs (cfg.caddy.virtualHost != null) {
-        virtualHosts.${cfg.caddy.virtualHost}.extraConfig = ''
-          reverse_proxy ${lib.optionalString isUnixSocket "unix/"}${listenAddress} {
-            lb_try_duration 30s
-          }
-        '';
-      }
-    );
+    services.caddy.virtualHosts = lib.optionalAttrs usesCaddy {
+      ${cfg.caddy.virtualHost}.extraConfig = ''
+        reverse_proxy ${lib.optionalString isUnixSocket "unix/"}${listenAddress} {
+          lb_try_duration 30s
+        }
+      '';
+    };
 
     services.postgresql = lib.mkIf cfg.database.createLocally {
       enable = true;
@@ -245,7 +235,7 @@ in
         };
       };
     }
-    // lib.optionalAttrs (cfg.caddy.enable && isUnixSocket) {
+    // lib.optionalAttrs (usesCaddy && isUnixSocket) {
       caddy.serviceConfig.SupplementaryGroups = [ cfg.group ];
     };
   };

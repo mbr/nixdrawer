@@ -31,10 +31,7 @@
           {
             services.test-web-app = {
               enable = true;
-              caddy = {
-                enable = true;
-                virtualHost = "http://localhost";
-              };
+              caddy.virtualHost = "http://localhost";
             };
             system.stateVersion = "26.05";
           }
@@ -44,6 +41,8 @@
     {
       checks.${system}.web-app-module =
         assert !(builtins.hasAttr "test-web-app" testSystem.config.systemd.sockets);
+        assert !testSystem.config.services.caddy.enable;
+        assert builtins.hasAttr "http://localhost" testSystem.config.services.caddy.virtualHosts;
         assert testSystem.config.systemd.services.test-web-app.serviceConfig.Type == "exec";
         testSystem.config.systemd.units."test-web-app.service".unit;
 

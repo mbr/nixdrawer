@@ -59,9 +59,11 @@ It assumes that:
 - it optionally uses Caddy as a local reverse proxy;
 - it binds its configured TCP or Unix listener.
 
-With Caddy enabled, the application listens on a private Unix socket by default.
-systemd manages the socket directory, while the application creates the socket.
-Caddy retries unavailable upstream connections for up to 30 seconds.
+Setting `services.<name>.caddy.virtualHost` configures the application to use a
+private Unix socket and adds a Caddy virtual host, but does not enable Caddy.
+Deployments enable `services.caddy` explicitly. systemd manages the socket
+directory, while the application creates the socket. Caddy retries unavailable
+upstream connections for up to 30 seconds.
 
 By default, the service runs the package's main program without arguments.
 `mkCommand` can construct another invocation, such as passing the generated
