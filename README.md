@@ -107,7 +107,7 @@ The above means that the volume with ID `327002837` will be mounted at `/mnt/exa
 | `hetznerCloud.volumes.<name>.mountPoint` | `/mnt/<name>` | Absolute mount point. |
 | `hetznerCloud.volumes.<name>.mountOptions` | `[ "defaults" ]` | Filesystem mount options. |
 
-During provisioning, Disko formats an unformatted volume as ext4, but preserves existing filesystems with `destroy = false`. Normal rebuilds do not run this formatting step. Volumes are required mounts, i.e. the system will not boot without them. Periodic trimming is enabled, instead of `discard`.
+During provisioning, Disko formats an unformatted volume as ext4, but preserves existing filesystems with `destroy = false`. Normal rebuilds do not run this formatting step. Volumes are required mounts, i.e. the system will not boot without them.
 
 ### `openssh-over-tailscale`
 

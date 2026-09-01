@@ -74,7 +74,6 @@
             ];
           assert fileSystem.device == volume.device;
           assert fileSystem.fsType == "ext4";
-          assert testHetznerSystem.config.services.fstrim.enable;
           testHetznerSystem.config.system.build.diskoScript;
 
         web-app-module =

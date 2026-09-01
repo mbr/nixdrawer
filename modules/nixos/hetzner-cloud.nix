@@ -142,8 +142,6 @@ in
       rm -f /etc/systemd/network/10-cloud-init-*.network
     '';
 
-    services.fstrim.enable = lib.mkIf (cfg.volumes != { }) (lib.mkDefault true);
-
     disko.devices.disk = {
       disk1 = {
         type = "disk";
