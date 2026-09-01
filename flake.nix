@@ -22,10 +22,10 @@
           ./modules/nixos/hetzner-cloud.nix
           {
             hetznerCloud.volumes = {
-              registry-images.id = 106766771;
+              example-data.id = 327002837;
               scratch = {
                 destroy = true;
-                id = 106766772;
+                id = 742635434;
               };
             };
             system.stateVersion = "26.05";
@@ -59,11 +59,11 @@
       checks.${system} = {
         hetzner-cloud-volume =
           let
-            fileSystem = testHetznerSystem.config.fileSystems."/mnt/registry-images";
+            fileSystem = testHetznerSystem.config.fileSystems."/mnt/example-data";
             scratch = testHetznerSystem.config.disko.devices.disk.hetzner-volume-scratch;
-            volume = testHetznerSystem.config.disko.devices.disk.hetzner-volume-registry-images;
+            volume = testHetznerSystem.config.disko.devices.disk.hetzner-volume-example-data;
           in
-          assert volume.device == "/dev/disk/by-id/scsi-0HC_Volume_106766771";
+          assert volume.device == "/dev/disk/by-id/scsi-0HC_Volume_327002837";
           assert !volume.destroy;
           assert scratch.destroy;
           assert volume.content.format == "ext4";

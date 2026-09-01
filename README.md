@@ -95,10 +95,10 @@ imports = [ nixdrawer.nixosModules.hetzner-cloud ];
 Create volumes with manual mounting in Hetzner Cloud, then configure them by the numeric ID shown in the console:
 
 ```nix
-hetznerCloud.volumes.registry-images.id = 106766771;
+hetznerCloud.volumes.example-data.id = 327002837;
 ```
 
-The above means that the volume with ID `106766771` will be mounted at `/mnt/registry-images`, see below if you need a different mount point.
+The above means that the volume with ID `327002837` will be mounted at `/mnt/example-data`, see below if you need a different mount point.
 
 | Option | Default | Description |
 | --- | --- | --- |
