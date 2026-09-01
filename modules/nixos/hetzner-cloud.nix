@@ -10,6 +10,27 @@
 }:
 let
   cfg = config.hetznerCloud;
+  volumeType = lib.types.submodule (
+    { name, ... }:
+    {
+      options = {
+        id = lib.mkOption {
+          type = lib.types.ints.positive;
+          description = "Numeric Hetzner Cloud volume ID.";
+        };
+        mountPoint = lib.mkOption {
+          type = lib.types.strMatching "^/.+";
+          default = "/mnt/${name}";
+          description = "Absolute path at which to mount the volume.";
+        };
+        mountOptions = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "defaults" ];
+          description = "Filesystem mount options.";
+        };
+      };
+    }
+  );
 in
 {
   imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
@@ -21,6 +42,11 @@ in
       description = "Channel fetched for target-side nixpkgs registry lookups; null uses the exact nixpkgs input and includes its source in the deployed system closure.";
     };
     useCloudInit = lib.mkEnableOption "cloud-init-based Hetzner configuration";
+    volumes = lib.mkOption {
+      type = lib.types.attrsOf volumeType;
+      default = { };
+      description = "Persistent Hetzner Cloud volumes to format as ext4 when empty and mount.";
+    };
   };
 
   config = {
@@ -111,8 +137,10 @@ in
       rm -f /etc/systemd/network/10-cloud-init-*.network
     '';
 
-    disko.devices = {
-      disk.disk1 = {
+    services.fstrim.enable = lib.mkIf (cfg.volumes != { }) (lib.mkDefault true);
+
+    disko.devices.disk = {
+      disk1 = {
         type = "disk";
         device = lib.mkDefault "/dev/sda";
         content = {
@@ -146,6 +174,24 @@ in
           };
         };
       };
-    };
+    }
+    // lib.mapAttrs' (
+      name: volume:
+      lib.nameValuePair "hetzner-volume-${name}" {
+        type = "disk";
+        device = "/dev/disk/by-id/scsi-0HC_Volume_${toString volume.id}";
+        destroy = false;
+        content = {
+          type = "filesystem";
+          format = "ext4";
+          extraArgs = [
+            "-m"
+            "0"
+          ];
+          mountpoint = volume.mountPoint;
+          mountOptions = volume.mountOptions;
+        };
+      }
+    ) cfg.volumes;
   };
 }

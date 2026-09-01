@@ -90,6 +90,23 @@ imports = [ nixdrawer.nixosModules.hetzner-cloud ];
 | --- | --- | --- |
 | `hetznerCloud.nixpkgsChannel` | `"nixos-${config.system.nixos.release}"` | Channel fetched for target-side `nixpkgs` registry lookups. Set it to `nixos-unstable` for an unstable input, another channel name when appropriate, or `null` to use the exact nixpkgs input and include its source in the deployed system closure. |
 | `hetznerCloud.useCloudInit` | `false` | Use cloud-init for network configuration while preserving the configured hostname and SSH host keys. |
+| `hetznerCloud.volumes` | `{ }` | Persistent Hetzner Cloud volumes managed and mounted through Disko. |
+
+Create volumes with manual mounting in Hetzner Cloud, then configure them by the numeric ID shown in the console:
+
+```nix
+hetznerCloud.volumes.registry-images.id = 106766771;
+```
+
+The above means that the volume with ID `106766771` will be mounted at `/mnt/registry-images`, see below if you need a different mount point.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `hetznerCloud.volumes.<name>.id` | Required | Numeric ID used to derive `/dev/disk/by-id/scsi-0HC_Volume_<id>`. |
+| `hetznerCloud.volumes.<name>.mountPoint` | `/mnt/<name>` | Absolute mount point. |
+| `hetznerCloud.volumes.<name>.mountOptions` | `[ "defaults" ]` | Filesystem mount options. |
+
+During provisioning, Disko formats an unformatted volume as ext4, but preserves existing filesystems with `destroy = false`. Normal rebuilds do not run this formatting step. Volumes are required mounts, i.e. the system will not boot without them. Periodic trimming is enabled, instead of `discard`.
 
 ### `openssh-over-tailscale`
 
