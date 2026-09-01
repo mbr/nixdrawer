@@ -14,6 +14,11 @@ let
     { name, ... }:
     {
       options = {
+        destroy = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Allow Disko to destroy the volume during provisioning.";
+        };
         id = lib.mkOption {
           type = lib.types.ints.positive;
           description = "Numeric Hetzner Cloud volume ID.";
@@ -180,7 +185,7 @@ in
       lib.nameValuePair "hetzner-volume-${name}" {
         type = "disk";
         device = "/dev/disk/by-id/scsi-0HC_Volume_${toString volume.id}";
-        destroy = false;
+        destroy = volume.destroy;
         content = {
           type = "filesystem";
           format = "ext4";

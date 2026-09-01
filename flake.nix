@@ -21,7 +21,13 @@
           disko.nixosModules.disko
           ./modules/nixos/hetzner-cloud.nix
           {
-            hetznerCloud.volumes.registry-images.id = 106766771;
+            hetznerCloud.volumes = {
+              registry-images.id = 106766771;
+              scratch = {
+                destroy = true;
+                id = 106766772;
+              };
+            };
             system.stateVersion = "26.05";
           }
         ];
@@ -54,10 +60,12 @@
         hetzner-cloud-volume =
           let
             fileSystem = testHetznerSystem.config.fileSystems."/mnt/registry-images";
+            scratch = testHetznerSystem.config.disko.devices.disk.hetzner-volume-scratch;
             volume = testHetznerSystem.config.disko.devices.disk.hetzner-volume-registry-images;
           in
           assert volume.device == "/dev/disk/by-id/scsi-0HC_Volume_106766771";
           assert !volume.destroy;
+          assert scratch.destroy;
           assert volume.content.format == "ext4";
           assert
             volume.content.extraArgs == [

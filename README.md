@@ -102,6 +102,7 @@ The above means that the volume with ID `106766771` will be mounted at `/mnt/reg
 
 | Option | Default | Description |
 | --- | --- | --- |
+| `hetznerCloud.volumes.<name>.destroy` | `false` | Allow provisioning to erase and recreate the volume. |
 | `hetznerCloud.volumes.<name>.id` | Required | Numeric ID used to derive `/dev/disk/by-id/scsi-0HC_Volume_<id>`. |
 | `hetznerCloud.volumes.<name>.mountPoint` | `/mnt/<name>` | Absolute mount point. |
 | `hetznerCloud.volumes.<name>.mountOptions` | `[ "defaults" ]` | Filesystem mount options. |
