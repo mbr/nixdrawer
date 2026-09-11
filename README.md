@@ -72,6 +72,40 @@ services.myapp.enable = true;
 services.myapp.caddy.virtualHost = "app.example.com";
 ```
 
+### Credentials
+
+Services created by `mkWebAppModule` use `DynamicUser`. Use systemd credentials to make secrets available without assigning ownership to the service's transient UID.
+
+Provision the secret as a runtime file, for example through `agenix` or `ragenix`, then configure the consuming service:
+
+```nix
+age.secrets.api-token.file = ./secrets/api-token.age;
+
+systemd.services.myapp.serviceConfig.LoadCredential = [
+  "api-token:${config.age.secrets.api-token.path}"
+];
+```
+
+At service startup, systemd reads the decrypted source file and supplies a private, read-only copy at `/run/credentials/myapp.service/api-token`. Configure the application to read that file using its own configuration format. For example, an application supporting file-backed values might use:
+
+```toml
+api_token = { file = "/run/credentials/myapp.service/api-token" }
+```
+
+Only the path belongs in Nix-generated application configuration. Do not read the decrypted secret during Nix evaluation or embed its contents in a generated file: that would expose it in the Nix store.
+
+For intentionally public dummy or development values, use `SetCredential` instead:
+
+```nix
+systemd.services.myapp.serviceConfig.SetCredential = [
+  "api-token:dummy-dev-key"
+];
+```
+
+The application reads the same credential path, but the literal value is exposed in the Nix store and unit definition.
+
+Credentials are loaded at service startup; restart the service after rotating a secret. The fixed paths above apply to system services. Applications can also locate their credential directory through the `CREDENTIALS_DIRECTORY` environment variable.
+
 ## NixOS modules
 
 ### `hetzner-cloud`
