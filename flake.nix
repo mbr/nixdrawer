@@ -37,31 +37,35 @@
         text = "exit 0";
         meta.mainProgram = "test-web-app";
       };
-      testSystem = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [
-          (lib.mkWebAppModule {
-            name = "test-web-app";
-            description = "Test web application";
-            defaultPackage = _: testPackage;
-            mkCommand =
-              {
-                lib,
-                package,
-                publicUrl,
-                ...
-              }:
-              [ (lib.getExe package) ] ++ lib.optional (publicUrl != null) "--public-url=${publicUrl}";
-          })
-          {
-            services.test-web-app = {
-              enable = true;
-              caddy.virtualHost = "http://localhost";
-            };
-            system.stateVersion = "26.05";
-          }
-        ];
-      };
+      testSystem = mkTestSystem "fixed";
+      mkTestSystem =
+        publicUrlSupport:
+        nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [
+            (lib.mkWebAppModule {
+              inherit publicUrlSupport;
+              name = "test-web-app";
+              description = "Test web application";
+              defaultPackage = _: testPackage;
+              mkCommand =
+                {
+                  lib,
+                  package,
+                  publicUrl,
+                  ...
+                }:
+                [ (lib.getExe package) ] ++ lib.optional (publicUrl != null) "--public-url=${publicUrl}";
+            })
+            {
+              services.test-web-app = {
+                enable = true;
+                caddy.virtualHost = "http://localhost";
+              };
+              system.stateVersion = "26.05";
+            }
+          ];
+        };
     in
     {
       checks.${system} = {
@@ -86,9 +90,10 @@
 
         web-app-public-url =
           let
-            configured =
-              settings:
-              (testSystem.extendModules {
+            configured = configuredWith "fixed";
+            configuredWith =
+              support: settings:
+              ((mkTestSystem support).extendModules {
                 modules = [ { services.test-web-app = settings; } ];
               }).config;
             valid =
@@ -98,9 +103,9 @@
                 assertion.assertion || !(nixpkgs.lib.hasPrefix "services.test-web-app." assertion.message)
               ) cfg.assertions;
             check =
-              settings: expected:
+              support: settings: expected:
               let
-                cfg = configured settings;
+                cfg = configuredWith support settings;
                 command = cfg.systemd.services.test-web-app.serviceConfig.ExecStart;
                 vhost = cfg.services.test-web-app.caddy.virtualHost;
                 proxy = cfg.services.caddy.virtualHosts.${vhost}.extraConfig;
@@ -125,23 +130,28 @@
                   '')
                 ];
             cases = builtins.concatLists [
-              (check { } "http://localhost")
-              (check { caddy.virtualHost = nixpkgs.lib.mkForce "app.example.com"; } "https://app.example.com")
-              (check { caddy.virtualHost = nixpkgs.lib.mkForce "localhost:80"; } "http://localhost:80")
-              (check { publicUrl.url = "https://[::1]:8443/"; } "https://[::1]:8443/")
-              (check { publicUrl = "request"; } null)
-              (check {
+              (check "fixed" { } "http://localhost")
+              (check "fixed" {
+                caddy.virtualHost = nixpkgs.lib.mkForce "app.example.com";
+              } "https://app.example.com")
+              (check "fixed" { caddy.virtualHost = nixpkgs.lib.mkForce "localhost:80"; } "http://localhost:80")
+              (check "fixed" { publicUrl.url = "https://[::1]:8443/"; } "https://[::1]:8443/")
+              (check "automatic" { } null)
+              (check "automatic" { publicUrl = "vhost"; } "http://localhost")
+              (check "automatic" { publicUrl.url = "https://example.com/"; } "https://example.com/")
+              (check "none" { } null)
+              (check "none" { caddy.virtualHost = nixpkgs.lib.mkForce null; } null)
+              (check "fixed" {
                 caddy.virtualHost = nixpkgs.lib.mkForce null;
                 listenAddress = "0.0.0.0:8080";
                 publicUrl.url = "http://192.0.2.10:8080/";
               } "http://192.0.2.10:8080/")
-              (check {
+              (check "fixed" {
                 caddy.virtualHost = nixpkgs.lib.mkForce null;
                 publicUrl.url = "https://example.com/app/";
               } "https://example.com/app/")
-              (check {
+              (check "automatic" {
                 caddy.virtualHost = nixpkgs.lib.mkForce null;
-                publicUrl = "request";
               } null)
             ];
             invalidUrls = [
@@ -153,6 +163,8 @@
               "https://example.com\nheader_up Spoofed true"
             ];
           in
+          assert !(testSystem.options.services.test-web-app.publicUrl.type.check "request");
+          assert !((mkTestSystem "none").options.services.test-web-app ? publicUrl);
           assert
             !(valid (configured {
               caddy.virtualHost = nixpkgs.lib.mkForce null;

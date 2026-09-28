@@ -2,6 +2,7 @@
   name,
   defaultPackage,
   description ? "${name} web application",
+  publicUrlSupport ? "fixed",
   mkCommand ?
     {
       lib,
@@ -10,6 +11,11 @@
     }:
     [ (lib.getExe package) ],
 }:
+assert builtins.elem publicUrlSupport [
+  "fixed"
+  "automatic"
+  "none"
+];
 {
   config,
   lib,
@@ -21,7 +27,7 @@ let
   cfg = config.services.${name};
   usesCaddy = cfg.caddy.virtualHost != null;
   publicUrl =
-    if cfg.publicUrl == "request" then
+    if publicUrlSupport == "none" || cfg.publicUrl == "request" then
       null
     else if cfg.publicUrl == "vhost" then
       if !usesCaddy then
@@ -98,34 +104,6 @@ in
       };
     };
 
-    publicUrl = lib.mkOption {
-      type =
-        lib.types.either
-          (lib.types.enum [
-            "vhost"
-            "request"
-          ])
-          (
-            lib.types.submodule {
-              options.url = lib.mkOption {
-                type = lib.types.str;
-                example = "https://app.example.com/";
-                description = "Fixed public HTTP(S) URL, with an optional port and path prefix, but no credentials, query, or fragment.";
-              };
-            }
-          );
-      default = "vhost";
-      description = ''
-        Public URL supplied to `mkCommand`. The `vhost` mode derives it from
-        `caddy.virtualHost` and requires Caddy integration. An attribute set
-        with `url` specifies a fixed URL, with or without a reverse proxy.
-        The `request` mode supplies `null`, leaving detection to the application.
-        Caddy always supplies its normal forwarded headers and strips
-        `X-Script-Name`. Request-derived URLs require application support and,
-        behind a reverse proxy, trusted headers from that proxy.
-      '';
-    };
-
     openFirewall = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -158,17 +136,44 @@ in
       };
 
     };
+  }
+  // lib.optionalAttrs (publicUrlSupport != "none") {
+    publicUrl = lib.mkOption {
+      type =
+        lib.types.either
+          (lib.types.enum ([ "vhost" ] ++ lib.optional (publicUrlSupport == "automatic") "request"))
+          (
+            lib.types.submodule {
+              options.url = lib.mkOption {
+                type = lib.types.str;
+                example = "https://app.example.com/";
+                description = "Fixed public HTTP(S) URL, with an optional port and path prefix, but no credentials, query, or fragment.";
+              };
+            }
+          );
+      default = if publicUrlSupport == "automatic" then "request" else "vhost";
+      description = ''
+        Public URL supplied to `mkCommand`. The `vhost` mode derives it from
+        `caddy.virtualHost` and requires Caddy integration. An attribute set
+        with `url` specifies a fixed URL, with or without a reverse proxy.
+        Applications declaring automatic URL support also accept `request`,
+        which supplies `null` and leaves detection to the application.
+        Caddy always supplies its normal forwarded headers and strips
+        `X-Script-Name`. Request-derived URLs require trusted proxy headers
+        when deployed behind a reverse proxy.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = cfg.publicUrl != "vhost" || usesCaddy;
-        message = "services.${name}.publicUrl = vhost requires caddy.virtualHost; set an explicit url or use request mode without Caddy";
+        assertion = publicUrlSupport == "none" || cfg.publicUrl != "vhost" || usesCaddy;
+        message = "services.${name}.publicUrl = vhost requires Caddy integration: set services.${name}.caddy.virtualHost or an explicit services.${name}.publicUrl.url";
       }
       {
         assertion = validPublicUrl;
-        message = "services.${name}.publicUrl must resolve to an HTTP(S) URL without credentials, query, fragment, or wildcard host; use request mode or an explicit url for wildcard virtual hosts";
+        message = "services.${name}.publicUrl must resolve to an HTTP(S) URL without credentials, query, fragment, or wildcard host; set an explicit publicUrl.url for wildcard virtual hosts";
       }
       {
         assertion = cfg.database.createLocally || cfg.database.url != null;
