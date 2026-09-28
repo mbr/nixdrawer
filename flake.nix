@@ -76,6 +76,81 @@
           assert fileSystem.fsType == "ext4";
           testHetznerSystem.config.system.build.diskoScript;
 
+        web-app-public-url =
+          let
+            configured =
+              settings:
+              (testSystem.extendModules {
+                modules = [ { services.test-web-app = settings; } ];
+              }).config;
+            valid =
+              cfg:
+              builtins.all (
+                assertion:
+                assertion.assertion || !(nixpkgs.lib.hasPrefix "services.test-web-app." assertion.message)
+              ) cfg.assertions;
+            headers =
+              settings:
+              let
+                cfg = configured settings;
+              in
+              assert valid cfg;
+              cfg.services.caddy.virtualHosts.${cfg.services.test-web-app.caddy.virtualHost}.extraConfig;
+            check =
+              settings: expected:
+              let
+                actual = headers settings;
+              in
+              assert builtins.all (line: nixpkgs.lib.hasInfix line actual) expected;
+              pkgs.writeText "public-url.Caddyfile" ''
+                http://localhost {
+                  ${actual}
+                }
+              '';
+            cases = [
+              (check { } [
+                ''header_up X-Forwarded-Proto "http"''
+                ''header_up X-Forwarded-Host "localhost"''
+              ])
+              (check { caddy.virtualHost = nixpkgs.lib.mkForce "app.example.com"; } [
+                ''header_up X-Forwarded-Proto "https"''
+                ''header_up X-Forwarded-Host "app.example.com"''
+              ])
+              (check { caddy.virtualHost = nixpkgs.lib.mkForce "localhost:80"; } [
+                ''header_up X-Forwarded-Proto "http"''
+                ''header_up X-Forwarded-Host "localhost:80"''
+              ])
+              (check { publicUrl.url = "https://[::1]:8443/"; } [
+                ''header_up X-Forwarded-Proto "https"''
+                ''header_up X-Forwarded-Host "[::1]:8443"''
+              ])
+              (check { publicUrl = "request"; } [ ])
+            ];
+            requestHeaders = headers { publicUrl = "request"; };
+            invalidUrls = [
+              "https://example.com/app"
+              "https://example.com?query"
+              "https://example.com#fragment"
+              "https://user@example.com"
+              "https://*.example.com"
+              "https://{host}"
+              "https://example.com\nheader_up Spoofed true"
+            ];
+          in
+          assert !(nixpkgs.lib.hasInfix "header_up X-Forwarded-" requestHeaders);
+          assert builtins.all (
+            url:
+            !(valid (configured {
+              publicUrl = { inherit url; };
+            }))
+          ) invalidUrls;
+          pkgs.runCommand "web-app-public-url" { nativeBuildInputs = [ pkgs.caddy ]; } ''
+            mkdir -p "$out"
+            for config in ${builtins.toString cases}; do
+              caddy adapt --adapter caddyfile --config "$config" > "$out/$(basename "$config").json"
+            done
+          '';
+
         web-app-module =
           assert !(builtins.hasAttr "test-web-app" testSystem.config.systemd.sockets);
           assert !testSystem.config.services.caddy.enable;

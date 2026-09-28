@@ -20,6 +20,29 @@
 let
   cfg = config.services.${name};
   usesCaddy = cfg.caddy.virtualHost != null;
+  publicUrl =
+    if cfg.publicUrl == "request" || !usesCaddy then
+      null
+    else if cfg.publicUrl == "vhost" then
+      if lib.hasInfix "://" cfg.caddy.virtualHost then
+        cfg.caddy.virtualHost
+      else
+        "${
+          if lib.hasSuffix ":80" cfg.caddy.virtualHost then "http" else "https"
+        }://${cfg.caddy.virtualHost}"
+    else
+      cfg.publicUrl.url;
+  publicOrigin =
+    if publicUrl == null then
+      null
+    else
+      builtins.match "(https?)://([a-zA-Z0-9._-]+|[[][0-9a-fA-F:.]+[]])(:([0-9]+))?/?" publicUrl;
+  publicHeaders = lib.optionalString (publicOrigin != null) ''
+    header_up X-Forwarded-Proto "${builtins.elemAt publicOrigin 0}"
+    header_up X-Forwarded-Host "${builtins.elemAt publicOrigin 1}${
+      if builtins.elemAt publicOrigin 2 == null then "" else builtins.elemAt publicOrigin 2
+    }"
+  '';
   listenAddress =
     if cfg.listenAddress != null then
       cfg.listenAddress
@@ -77,6 +100,33 @@ in
       };
     };
 
+    publicUrl = lib.mkOption {
+      type =
+        lib.types.either
+          (lib.types.enum [
+            "vhost"
+            "request"
+          ])
+          (
+            lib.types.submodule {
+              options.url = lib.mkOption {
+                type = lib.types.str;
+                example = "https://app.example.com/";
+                description = "Fixed public HTTP(S) origin, with an optional port and trailing slash, but no path, query, or fragment.";
+              };
+            }
+          );
+      default = "vhost";
+      description = ''
+        Public origin advertised through Caddy's X-Forwarded-Host and
+        X-Forwarded-Proto headers. The vhost mode derives it from
+        caddy.virtualHost; request keeps Caddy's request-derived defaults.
+        An attribute set with url specifies a fixed origin. Only applies
+        when Caddy integration is enabled. Applications must explicitly
+        trust these headers from the proxy.
+      '';
+    };
+
     openFirewall = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -114,6 +164,10 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
+        assertion = publicUrl == null || publicOrigin != null;
+        message = "services.${name}.publicUrl must resolve to a single HTTP(S) origin without a path, query, fragment, or wildcard; use request mode or an explicit url for wildcard virtual hosts";
+      }
+      {
         assertion = cfg.database.createLocally || cfg.database.url != null;
         message = "services.${name}.database.url must be set when local database provisioning is disabled";
       }
@@ -145,6 +199,7 @@ in
       ${cfg.caddy.virtualHost}.extraConfig = ''
         reverse_proxy ${lib.optionalString isUnixSocket "unix/"}${listenAddress} {
           lb_try_duration 30s
+          ${publicHeaders}
         }
       '';
     };
