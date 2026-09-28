@@ -199,6 +199,7 @@ in
       ${cfg.caddy.virtualHost}.extraConfig = ''
         reverse_proxy ${lib.optionalString isUnixSocket "unix/"}${listenAddress} {
           lb_try_duration 30s
+          header_up -X-Script-Name
           ${publicHeaders}
         }
       '';

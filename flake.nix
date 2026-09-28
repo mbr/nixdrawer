@@ -101,6 +101,7 @@
               let
                 actual = headers settings;
               in
+              assert nixpkgs.lib.hasInfix "header_up -X-Script-Name" actual;
               assert builtins.all (line: nixpkgs.lib.hasInfix line actual) expected;
               pkgs.writeText "public-url.Caddyfile" ''
                 http://localhost {
