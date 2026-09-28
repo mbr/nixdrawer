@@ -44,6 +44,14 @@
             name = "test-web-app";
             description = "Test web application";
             defaultPackage = _: testPackage;
+            mkCommand =
+              {
+                lib,
+                package,
+                publicUrl,
+                ...
+              }:
+              [ (lib.getExe package) ] ++ lib.optional (publicUrl != null) "--public-url=${publicUrl}";
           })
           {
             services.test-web-app = {
@@ -89,47 +97,54 @@
                 assertion:
                 assertion.assertion || !(nixpkgs.lib.hasPrefix "services.test-web-app." assertion.message)
               ) cfg.assertions;
-            headers =
-              settings:
-              let
-                cfg = configured settings;
-              in
-              assert valid cfg;
-              cfg.services.caddy.virtualHosts.${cfg.services.test-web-app.caddy.virtualHost}.extraConfig;
             check =
               settings: expected:
               let
-                actual = headers settings;
+                cfg = configured settings;
+                command = cfg.systemd.services.test-web-app.serviceConfig.ExecStart;
+                vhost = cfg.services.test-web-app.caddy.virtualHost;
+                proxy = cfg.services.caddy.virtualHosts.${vhost}.extraConfig;
               in
-              assert nixpkgs.lib.hasInfix "header_up -X-Script-Name" actual;
-              assert builtins.all (line: nixpkgs.lib.hasInfix line actual) expected;
-              pkgs.writeText "public-url.Caddyfile" ''
-                http://localhost {
-                  ${actual}
-                }
-              '';
-            cases = [
-              (check { } [
-                ''header_up X-Forwarded-Proto "http"''
-                ''header_up X-Forwarded-Host "localhost"''
-              ])
-              (check { caddy.virtualHost = nixpkgs.lib.mkForce "app.example.com"; } [
-                ''header_up X-Forwarded-Proto "https"''
-                ''header_up X-Forwarded-Host "app.example.com"''
-              ])
-              (check { caddy.virtualHost = nixpkgs.lib.mkForce "localhost:80"; } [
-                ''header_up X-Forwarded-Proto "http"''
-                ''header_up X-Forwarded-Host "localhost:80"''
-              ])
-              (check { publicUrl.url = "https://[::1]:8443/"; } [
-                ''header_up X-Forwarded-Proto "https"''
-                ''header_up X-Forwarded-Host "[::1]:8443"''
-              ])
-              (check { publicUrl = "request"; } [ ])
+              assert valid cfg;
+              assert
+                if expected == null then
+                  !(nixpkgs.lib.hasInfix "--public-url=" command)
+                else
+                  nixpkgs.lib.hasInfix "--public-url=${expected}" command;
+              if vhost == null then
+                assert cfg.services.caddy.virtualHosts == { };
+                [ ]
+              else
+                assert nixpkgs.lib.hasInfix "header_up -X-Script-Name" proxy;
+                assert !(nixpkgs.lib.hasInfix "X-Forwarded-" proxy);
+                [
+                  (pkgs.writeText "public-url.Caddyfile" ''
+                    http://localhost {
+                      ${proxy}
+                    }
+                  '')
+                ];
+            cases = builtins.concatLists [
+              (check { } "http://localhost")
+              (check { caddy.virtualHost = nixpkgs.lib.mkForce "app.example.com"; } "https://app.example.com")
+              (check { caddy.virtualHost = nixpkgs.lib.mkForce "localhost:80"; } "http://localhost:80")
+              (check { publicUrl.url = "https://[::1]:8443/"; } "https://[::1]:8443/")
+              (check { publicUrl = "request"; } null)
+              (check {
+                caddy.virtualHost = nixpkgs.lib.mkForce null;
+                listenAddress = "0.0.0.0:8080";
+                publicUrl.url = "http://192.0.2.10:8080/";
+              } "http://192.0.2.10:8080/")
+              (check {
+                caddy.virtualHost = nixpkgs.lib.mkForce null;
+                publicUrl.url = "https://example.com/app/";
+              } "https://example.com/app/")
+              (check {
+                caddy.virtualHost = nixpkgs.lib.mkForce null;
+                publicUrl = "request";
+              } null)
             ];
-            requestHeaders = headers { publicUrl = "request"; };
             invalidUrls = [
-              "https://example.com/app"
               "https://example.com?query"
               "https://example.com#fragment"
               "https://user@example.com"
@@ -138,7 +153,14 @@
               "https://example.com\nheader_up Spoofed true"
             ];
           in
-          assert !(nixpkgs.lib.hasInfix "header_up X-Forwarded-" requestHeaders);
+          assert
+            !(valid (configured {
+              caddy.virtualHost = nixpkgs.lib.mkForce null;
+            }));
+          assert
+            !(valid (configured {
+              caddy.virtualHost = nixpkgs.lib.mkForce "*.example.com";
+            }));
           assert builtins.all (
             url:
             !(valid (configured {

@@ -37,13 +37,19 @@ nixdrawer.lib.mkWebAppModule {
       listenAddress,
       package,
       pkgs,
+      publicUrl,
       ...
     }:
     let
-      configurationFile = (pkgs.formats.toml { }).generate "myapp.toml" {
-        database_url = databaseUrl;
-        listen_address = listenAddress;
-      };
+      configurationFile = (pkgs.formats.toml { }).generate "myapp.toml" (
+        {
+          database_url = databaseUrl;
+          listen_address = listenAddress;
+        }
+        // lib.optionalAttrs (publicUrl != null) {
+          public_url = publicUrl;
+        }
+      );
     in
     [
       (lib.getExe package)
@@ -62,6 +68,8 @@ By default, the service runs the package's main program without arguments.
 `mkCommand` can construct another invocation, such as passing the generated
 TOML configuration shown above.
 
+`mkCommand` receives `publicUrl` as a resolved URL string or `null` for request-derived detection. The callback must pass it to the application in its configuration format; nixdrawer does not set an application environment variable or override proxy headers for it.
+
 ### Using an application
 
 An application module built with `mkWebAppModule` can be served through Caddy with:
@@ -71,6 +79,25 @@ services.caddy.enable = true;
 services.myapp.enable = true;
 services.myapp.caddy.virtualHost = "app.example.com";
 ```
+
+### Public URLs
+
+`services.myapp.publicUrl` defaults to `"vhost"`, deriving the public URL from `caddy.virtualHost`. Bare hostnames use HTTPS, except addresses ending in `:80`; an explicit HTTP(S) scheme is preserved. This mode requires a Caddy virtual host. For the example above, the application receives `https://app.example.com`.
+
+Set an explicit URL for standalone operation or an external reverse proxy. Domain names and IP addresses are supported, with an optional port and path prefix. The URL must describe the client-facing address, not necessarily the listener:
+
+```nix
+services.myapp = {
+  enable = true;
+  listenAddress = "0.0.0.0:8080";
+  openFirewall = true;
+  publicUrl.url = "http://192.0.2.10:8080/";
+};
+```
+
+Behind an external reverse proxy, keep the listener private and set `publicUrl.url` to the proxy's public URL, such as `https://app.example.com/`. Explicit URLs also work with Caddy. Credentials, queries, and fragments are not supported. A path prefix describes where the application is served; it does not configure proxy path routing.
+
+Set `publicUrl = "request"` to pass `null` instead. The application must support deriving its address from requests; behind a proxy, it must trust that proxy's headers and prevent clients from bypassing it. Caddy supplies its normal forwarded headers in every mode and strips `X-Script-Name`, since this module does not configure prefix mounting. Without Caddy, header handling is the external proxy's responsibility. Applications using a fixed public URL need not rely on headers for URL construction.
 
 ### Credentials
 
