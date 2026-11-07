@@ -12,10 +12,7 @@
   outputs =
     { disko, nixpkgs, ... }:
     let
-      lib = {
-        mkWebAppModule = import ./lib/mk-web-app-module.nix;
-        tailscaleBoundServices = import ./lib/tailscale-bound-services.nix { inherit (nixpkgs) lib; };
-      };
+      lib.mkWebAppModule = import ./lib/mk-web-app-module.nix;
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       testHetznerSystem = nixpkgs.lib.nixosSystem {
@@ -72,11 +69,6 @@
     in
     {
       checks.${system} = {
-        tailscale-bound-services = import ./lib/tailscale-bound-services-test.nix {
-          inherit nixpkgs system;
-          inherit (lib) tailscaleBoundServices;
-        };
-
         hetzner-cloud-volume =
           let
             fileSystem = testHetznerSystem.config.fileSystems."/mnt/example-data";
@@ -210,6 +202,7 @@
           ./modules/nixos/hetzner-cloud.nix
         ];
         openssh-over-tailscale = import ./modules/nixos/openssh-over-tailscale.nix;
+        tailscale-dependent-services = ./modules/nixos/tailscale-dependent-services.nix;
       };
     };
 }

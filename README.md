@@ -139,20 +139,6 @@ The application reads the same credential path, but the literal value is exposed
 
 Credentials are loaded at service startup; restart the service after rotating a secret. The fixed paths above apply to system services. Applications can also locate their credential directory through the `CREDENTIALS_DIRECTORY` environment variable.
 
-### `tailscaleBoundServices`
-
-Adds Tailscale startup ordering and unlimited retries to existing systemd services:
-
-```nix
-systemd.services = nixdrawer.lib.tailscaleBoundServices [
-  "caddy"
-  "postgresql"
-];
-```
-
-Adds `Wants` and `After` dependencies on `tailscale-online.target` and retries
-failed services every 15 seconds without a retry limit.
-
 ## NixOS modules
 
 ### `hetzner-cloud`
@@ -215,3 +201,27 @@ A recommended setup is:
 2. Store the OAuth client secret or auth key with the host's secret provider and point `services.tailscale.authKeyFile` at the decrypted file.
 3. Put the permitted tag in `services.tailscale.advertiseTags` and grant administrators access to its SSH port in the tailnet policy.
 4. Configure authorized keys and stable OpenSSH host keys normally on the host.
+
+### `tailscale-dependent-services`
+
+Adds Tailscale startup ordering and unlimited retries to existing systemd services:
+
+```nix
+imports = [ nixdrawer.nixosModules.tailscale-dependent-services ];
+
+services.tailscale.dependentServices = [
+  "caddy"
+  "postgresql"
+];
+```
+
+Adds `Wants` and `After` dependencies on `tailscale-online.target` and retries
+failed services every 15 seconds without a retry limit.
+
+Application modules can each import this module and contribute service names;
+the lists merge. Share the `nixdrawer` input through `follows` so repeated imports
+resolve to the same module file:
+
+```nix
+inputs.myapp.inputs.nixdrawer.follows = "nixdrawer";
+```
