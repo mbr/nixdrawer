@@ -141,8 +141,7 @@ Credentials are loaded at service startup; restart the service after rotating a 
 
 ### `tailscaleBoundServices`
 
-`tailscaleBoundServices` returns settings to merge into `systemd.services` for
-existing services that bind to Tailscale addresses:
+Adds Tailscale startup ordering and unlimited retries to existing systemd services:
 
 ```nix
 systemd.services = nixdrawer.lib.tailscaleBoundServices [
