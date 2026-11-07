@@ -151,17 +151,8 @@ systemd.services = nixdrawer.lib.tailscaleBoundServices [
 ];
 ```
 
-Enable `services.tailscale` separately and use a Tailscale package providing
-`tailscale-online.target` and `tailscale-wait-online.service`. The helper adds
-`Wants` and `After` dependencies on the target, which waits through
-`tailscale wait`. It forces `Restart=on-failure`, `RestartSec=15s`,
-`RestartSteps=0` and `StartLimitIntervalSec=0`, overriding existing retry policies
-so failed starts keep retrying without backoff or rate limiting.
-
-This is startup ordering, not continuous connectivity monitoring. A failed
-readiness target does not prevent the service from starting; failed binds are
-retried. The helper does not enable services, choose bind addresses, change
-firewall rules or configure Tailscale authentication.
+Adds `Wants` and `After` dependencies on `tailscale-online.target` and retries
+failed services every 15 seconds without a retry limit.
 
 ## NixOS modules
 
